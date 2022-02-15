@@ -7,7 +7,7 @@ const int maxCommandSymbolLength = 50;
 const int maxCommandArgumentLength = 7;
 
 int main() {
-    char* res;
+    char *res;
     char command[maxCommandSymbolLength];
     char *arguments[maxCommandArgumentLength];
     struct dataBase db = newDataBase();

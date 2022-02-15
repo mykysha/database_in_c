@@ -1,4 +1,6 @@
 #include <string.h>
+#include <stdbool.h>
+#include <ctype.h>
 #include "stringoperations.h"
 
 int findCommandLen(char command[]) {
@@ -18,4 +20,12 @@ int findCommandLen(char command[]) {
     count++;
 
     return count;
+}
+
+bool isNumber(const char* line) {
+    for(int i = 0; line[i] != '\0'; ++i) {
+        if (isdigit(line[i]) == 0) return false;
+    }
+
+    return true;
 }

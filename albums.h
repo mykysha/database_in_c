@@ -6,8 +6,9 @@
 struct Album {
     int id;
     char name[maxAlbumLineLength];
-    char artist[maxAlbumLineLength];
+    int artist_id;
     int year;
+    int nextSlave;
 };
 
 #endif

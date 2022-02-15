@@ -4,17 +4,18 @@
 #include "albums.h"
 #include "artists.h"
 
-#define maxDatabaseSize 100
-
 struct dataBase {
     int albumNumber;
-    struct Album albums[maxDatabaseSize];
     int artistNumber;
-    struct Artist artists[maxDatabaseSize];
+    int firstAlbumData;
+    int firstArtistData;
+    int fileSpaceArtists;
+    int fileSpaceAlbums;
 };
 
 struct dataBase newDataBase();
 char* processCommand(int,char* [], struct dataBase*);
+char* init(struct dataBase* db);
 char* getMFunc(int, char* [], struct dataBase*);
 char* getSFunc(int, char* [], struct dataBase*);
 char* delMFunc(int, char* [], struct dataBase*);
@@ -23,7 +24,6 @@ char* updateMFunc(int, char* [], struct dataBase*);
 char* updateSFunc(int, char* [], struct dataBase*);
 char* insertMFunc(int, char* [], struct dataBase*);
 char* insertSFunc(int, char* [], struct dataBase*);
-char* countFunc(int, char* [], struct dataBase*);
-char* exitFunc();
+const char* exitFunc();
 
 #endif
