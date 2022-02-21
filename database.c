@@ -59,8 +59,11 @@ char* processCommand(int argumentNumber, char* command[], struct dataBase* db) {
     } else if (strcmp(argument, insertSCommand) == 0) {
         return insertSHandler(argumentNumber, command, db);
 
+    } else if (strcmp(argument, countCommand) == 0) {
+        return countHandler(argumentNumber, db);
+
     } else if (strcmp(argument, exitCommand) == 0) {
-        return exitHandler();
+        return exitHandler(argumentNumber);
 
     } else {
         return errUnknownCommand;

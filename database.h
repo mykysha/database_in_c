@@ -42,6 +42,8 @@ int insertMaster(struct Artist artist, struct dataBase* db);
 char* insertSHandler(int argc, char* command[], struct dataBase* db);
 int insertSlave(struct Album album, struct dataBase* db);
 
-const char* exitHandler();
+char* countHandler(int argc, struct dataBase* db);
+
+const char* exitHandler(int argc);
 
 #endif
