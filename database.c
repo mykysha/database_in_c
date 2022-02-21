@@ -6,15 +6,16 @@
 #include "stringoperations.h"
 
 // Commands
-const char getM[] = "get-m";
-const char getS[] = "get-s";
-const char delM[] = "del-m";
-const char delS[] = "del-s";
-const char updateM[] = "update-m";
-const char updateS[] = "update-s";
-const char insertM[] = "insert-m";
-const char insertS[] = "insert-s";
-const char exitCmd[] = "exit";
+const char getMCommand[] = "get-m";
+const char getSCommand[] = "get-s";
+const char delMCommand[] = "del-m";
+const char delSCommand[] = "del-s";
+const char updateMCommand[] = "update-m";
+const char updateSCommand[] = "update-s";
+const char insertMCommand[] = "insert-m";
+const char insertSCommand[] = "insert-s";
+const char countCommand[] = "count";
+const char exitCommand[] = "exit";
 
 // Errors
 char errUnknownCommand[] = "Entered command is not defined.";
@@ -24,36 +25,43 @@ char errMasterFailure[] = "Failed to work with master file";
 char errIndexFailure[] = "Failed to work with index file";
 char errSlaveFailure[] = "Failed to work with slave file";
 char errInit[] = "Failed to initialize database";
-char errArtistNotExists[] = "Artist with such id does not exist in current database";
+char errMasterNotExists[] = "Artist with such id does not exist in current database";
 char errSlaveNotExists[] = "Slave with such id does not exist in current database";
 char errNoSlaves[] = "This master has no slaves";
-
-// Other
-char nothingToReturn[] = "Nothing to return yet";
+char errUnhandled[] = "Received critical error while doing this operation";
 
 char* processCommand(int argumentNumber, char* command[], struct dataBase* db) {
     char *argument = command[0];
 
     command++;
 
-    if (strcmp(argument, getM) == 0) {
-        return getMFunc(argumentNumber, command, db);
-    } else if (strcmp(argument, getS) == 0) {
-        return getSFunc(argumentNumber, command, db);
-    } else if (strcmp(argument, delM) == 0) {
-        return delMFunc(argumentNumber, command, db);
-    } else if (strcmp(argument, delS) == 0) {
-        return delSFunc(argumentNumber, command, db);
-    } else if (strcmp(argument, updateM) == 0) {
-        return updateMFunc(argumentNumber, command, db);
-    } else if (strcmp(argument, updateS) == 0) {
-        return updateSFunc(argumentNumber, command, db);
-    } else if (strcmp(argument, insertM) == 0) {
-        return insertMFunc(argumentNumber, command, db);
-    } else if (strcmp(argument, insertS) == 0) {
-        return insertSFunc(argumentNumber, command, db);
-    } else if (strcmp(argument, exitCmd) == 0) {
-        return exitFunc();
+    if (strcmp(argument, getMCommand) == 0) {
+        return getMHandler(argumentNumber, command, db);
+
+    } else if (strcmp(argument, getSCommand) == 0) {
+        return getSHandler(argumentNumber, command, db);
+
+    } else if (strcmp(argument, delMCommand) == 0) {
+        return delMHandler(argumentNumber, command, db);
+
+    } else if (strcmp(argument, delSCommand) == 0) {
+        return delSHandler(argumentNumber, command, db);
+
+    } else if (strcmp(argument, updateMCommand) == 0) {
+        return updateMHandler(argumentNumber, command, db);
+
+    } else if (strcmp(argument, updateSCommand) == 0) {
+        return updateSHandler(argumentNumber, command, db);
+
+    } else if (strcmp(argument, insertMCommand) == 0) {
+        return insertMHandler(argumentNumber, command, db);
+
+    } else if (strcmp(argument, insertSCommand) == 0) {
+        return insertSHandler(argumentNumber, command, db);
+
+    } else if (strcmp(argument, exitCommand) == 0) {
+        return exitHandler();
+
     } else {
         return errUnknownCommand;
     }
@@ -68,7 +76,7 @@ char* init(struct dataBase* db) {
     return "Database initialized";
 }
 
-char* getMFunc(int argc, char* command[], struct dataBase* db) {
+char* getMHandler(int argc, char* command[], struct dataBase* db) {
     if (argc != 1) {
         return errWrongArgumentNumber;
     }
@@ -79,22 +87,37 @@ char* getMFunc(int argc, char* command[], struct dataBase* db) {
 
     int id = atoi(command[0]);
 
-    struct Artist artist = &getMaster(id, db);
+    struct Artist *artist = NULL;
 
-    if (artist == NULL) {
-        return errMasterFailure;
+    int err = getMaster(artist, id, db);
+    if (err != 0) {
+        if (err == 1) {
+            return errMasterFailure;
+        }
+
+        return errUnhandled;
     }
 
     char res[maxStringLength];
 
-    sprintf(res, "id: %d, name %s", artist.id, artist.name);
+    sprintf(res, "id: %d, name %s", artist->id, artist->name);
 
     printf("%s", res);
 
     return "read successfully";
 }
 
-char* getSFunc(int argc, char* command[], struct dataBase* db) {
+int getMaster(struct Artist* artist, int id, struct dataBase* db) {
+    artist = readMaster(id, db);
+
+    if (artist == NULL) {
+        return 1;
+    }
+
+    return 0;
+}
+
+char* getSHandler(int argc, char* command[], struct dataBase* db) {
     if (argc != 2) {
         return errWrongArgumentNumber;
     }
@@ -109,29 +132,58 @@ char* getSFunc(int argc, char* command[], struct dataBase* db) {
 
     int artist_id = atoi(command[1]);
 
-    struct Artist* artist = getMasterByAddress(artist_id);
-    if (artist->slave1 == -1) {
-        return errNoSlaves;
-    }
-
-    int firstSlave = artist->slave1;
-
     int id = atoi(command[0]);
 
-    int slaveAddress = getSlaveAddress(id, firstSlave);
-    if (slaveAddress == -1) {
-        return errSlaveNotExists;
+    struct Album *album = NULL;
+
+    int err = getSlave(album, id, artist_id, db);
+    if (err != 0) {
+        if (err == -1) {
+            return errNoSlaves;
+        }
+
+        if (err == 1) {
+            return errSlaveNotExists;
+        }
+
+        if (err == 2) {
+            return errSlaveFailure;
+        }
+
+        return errUnhandled;
     }
 
-    struct Album *album = getSlaveByAddress(slaveAddress);
-    if (album == NULL) {
-        return errSlaveFailure;
-    }
+    char res[maxStringLength];
+
+    sprintf(res, "id: %d, name: %s, artist id: %d, year: %d", album->id, album->name, album->artist_id, album->year);
+
+    printf("%s", res);
 
     return "read successfully";
 }
 
-char* delMFunc(int argc, char* command[], struct dataBase* db) {
+int getSlave(struct Album* album, int id, int artist_id, struct dataBase* db) {
+    struct Artist* artist = getMasterByAddress(artist_id);
+    if (artist->slave1 == -1) {
+        return -1;
+    }
+
+    int firstSlave = artist->slave1;
+
+    int slaveAddress = getSlaveAddress(id, firstSlave);
+    if (slaveAddress == -1) {
+        return 1;
+    }
+
+    album = getSlaveByAddress(slaveAddress);
+    if (album == NULL) {
+        return 2;
+    }
+
+    return 0;
+}
+
+char* delMHandler(int argc, char* command[], struct dataBase* db) {
     if (argc != 1) {
         return errWrongArgumentNumber;
     }
@@ -142,20 +194,60 @@ char* delMFunc(int argc, char* command[], struct dataBase* db) {
 
     int id = atoi(command[0]);
 
-    int address = getIndex(id, db);
+    int err = delMaster(id, db);
+    if (err != 0) {
+        if (err == 1) {
+            return errMasterNotExists;
+        }
 
-    if(address == -1) {
-        return errArtistNotExists;
-    } else {
-        deleteAllSlaves(address);
-        deleteMaster(address);
-        deleteIndex(id, db);
+        if (err == 2) {
+            return errSlaveFailure;
+        }
+
+        if (err == 3) {
+            return errMasterFailure;
+        }
+
+        if (err == 4) {
+            return errIndexFailure;
+        }
+
+        return errUnhandled;
     }
 
     return "deleted successfully";
 }
 
-char* delSFunc(int argc, char* command[], struct dataBase* db) {
+int delMaster(int id, struct dataBase* db) {
+    int address = readIndex(id, db);
+
+    if(address == -1) {
+        return 1;
+    } else {
+        struct Artist* artist = getMasterByAddress(address);
+
+        int err = 0;
+
+        err = deleteAllSlaves(artist->slave1);
+        if (err != 0) {
+            return 2;
+        }
+
+        err = deleteMaster(address);
+        if (err != 0) {
+            return 3;
+        }
+
+        err = deleteIndex(id, db);
+        if (err != 0) {
+            return 4;
+        }
+    }
+
+    return 0;
+}
+
+char* delSHandler(int argc, char* command[], struct dataBase* db) {
     if (argc != 2) {
         return errWrongArgumentNumber;
     }
@@ -168,68 +260,104 @@ char* delSFunc(int argc, char* command[], struct dataBase* db) {
         return errShouldBeNumber;
     }
 
+    int id = atoi(command[0]);
+
     int artist_id = atoi(command[1]);
 
+    int err = delSlave(id, artist_id, db);
+    if (err != 0) {
+        if (err == 1) {
+            return errNoSlaves;
+        }
+
+        if (err == 2) {
+            return errSlaveNotExists;
+        }
+
+        return errUnhandled;
+    }
+
+    return "deleted successfully";
+}
+
+int delSlave(int id, int artist_id, struct dataBase* db) {
     struct Artist* artist = getMasterByAddress(artist_id);
     if (artist->slave1 == -1) {
-        return errNoSlaves;
+        return 1;
     }
 
     int firstSlave = artist->slave1;
 
-    int id = atoi(command[0]);
 
     int slaveAddress = getSlaveAddress(id, firstSlave);
     if (slaveAddress == -1) {
-        return errSlaveNotExists;
+        return 2;
     }
 
     deleteSlave(slaveAddress);
 
-    return nothingToReturn;
+    return 0;
 }
 
-char* updateMFunc(int argc, char* command[], struct dataBase* db) {
-    if (argc != 1) {
+char* updateMHandler(int argc, char* command[], struct dataBase* db) {
+    if (argc != 2) {
         return errWrongArgumentNumber;
     }
 
     int id = atoi(command[0]);
 
-    int oldAddr = getIndex(id, db);
+    int oldAddr = readIndex(id, db);
     deleteMaster(oldAddr);
     deleteIndex(id, db);
 
     struct Artist artist;
-    struct ArtistInd artistInd;
 
     db->fileSpaceArtists++;
 
     artist.id = id;
-    strcpy(artist.name, command[0]);
+    strcpy(artist.name, command[1]);
     artist.slave1 = -1;
 
-    int address = writeToMaster(artist);
-    if (address == -1) {
-        return errMasterFailure;
+    int err = updateMaster(artist, db);
+    if (err != 0) {
+        if (err == 1) {
+            return errMasterFailure;
+        }
+
+        if (err == 2) {
+            return errIndexFailure;
+        }
+
+        return errUnhandled;
     }
-
-    artistInd.id = id;
-    artistInd.address = address;
-
-    int err = writeToIndex(artistInd);
-    if (err == 1) {
-        return errIndexFailure;
-    }
-
-    save(db);
 
     printf("id: %d", artist.id);
 
     return "insert done successfully";
 }
 
-char* updateSFunc(int argc, char* command[], struct dataBase* db) {
+int updateMaster(struct Artist artist, struct dataBase* db) {
+    struct ArtistInd artistInd;
+
+    int address = writeToMaster(artist);
+    if (address == -1) {
+        return 1;
+    }
+
+    artistInd.id = artist.id;
+    artistInd.address = address;
+
+    int err = writeToIndex(artistInd);
+    if (err == 1) {
+        return 2;
+    }
+
+    save(db);
+
+    return 0;
+}
+
+char* updateSHandler(int argc, char* command[], struct dataBase* db) {
     if (argc != 4) {
         return errWrongArgumentNumber;
     }
@@ -252,28 +380,56 @@ char* updateSFunc(int argc, char* command[], struct dataBase* db) {
 
     struct Album album;
 
-    int address = getIndex(artist_id, db);
+    album.id = id;
+    strcpy(album.name, command[1]);
+    album.year = year;
+    album.artist_id = artist_id;
+
+    int err = updateSlave(album, db);
+    if (err != 0) {
+        if (err == 1) {
+            return errMasterNotExists;
+        }
+
+        if (err == 2) {
+            return errSlaveFailure;
+        }
+
+        if (err == 3) {
+            return errMasterFailure;
+        }
+
+        return errUnhandled;
+    }
+
+    printf("id: %d", album.id);
+
+    return "insert done successfully";
+}
+
+int updateSlave(struct Album album, struct dataBase* db) {
+    int address = readIndex(album.artist_id, db);
 
     if (address == -1) {
-        return errArtistNotExists;
+        return 1;
     }
 
     struct Artist* artist;
 
     artist = getMasterByAddress(address);
 
-    int oldAddr = getSlaveAddress(id, artist->slave1);
+    int oldAddr = getSlaveAddress(album.id, artist->slave1);
+    int albumNextSlave = getSlaveByAddress(oldAddr)->nextSlave;
 
-    deleteSlave(oldAddr);
+    album.nextSlave = albumNextSlave;
+
+    int err = deleteSlave(oldAddr);
+    if (err != 0) {
+        return 2;
+    }
 
     db->fileSpaceAlbums++;
     db->albumNumber++;
-
-    album.id = id;
-    strcpy(album.name, command[1]);
-    album.year = year;
-    album.artist_id = artist_id;
-    album.nextSlave = -1;
 
     int slaveAddress = writeToSlave(album);
 
@@ -281,23 +437,27 @@ char* updateSFunc(int argc, char* command[], struct dataBase* db) {
 
     int nextSlave;
 
-    if (artist->slave1 == -1) {
+    if (artist->slave1 == -1 || artist->slave1 == oldAddr) {
         artist->slave1 = slaveAddress;
-        updateMFunc(1, &artist->name, db);
+
+        err = updateMaster(*artist, db);
+        if (err != 0) {
+            return 3;
+        }
     } else {
         nextSlave = artist->slave1;
 
         for (;;) {
             struct Album* slaveAlbum = getSlaveByAddress(nextSlave);
 
-            if (slaveAlbum->nextSlave == -1) {
+            if (slaveAlbum->nextSlave == -1 || slaveAlbum->nextSlave == oldAddr) {
                 slaveAlbum->nextSlave = slaveAddress;
-                char cmd[3][maxStringLength] = {
-                        (char) slaveAlbum->name,
-                        slaveAlbum->artist_id,
-                        slaveAlbum->year,
-                };
-                updateSFunc(3, cmd, db);
+
+                err = updateSlave(*slaveAlbum, db);
+                if (err != 0) {
+                    return 2;
+                }
+
                 break;
             }
 
@@ -307,31 +467,46 @@ char* updateSFunc(int argc, char* command[], struct dataBase* db) {
 
     save(db);
 
-    printf("id: %d", album.id);
-
-    return "insert done successfully";
-
-    return nothingToReturn;
+    return 0;
 }
 
-char* insertMFunc(int argc, char* command[], struct dataBase* db) {
+char* insertMHandler(int argc, char* command[], struct dataBase* db) {
     if (argc != 1) {
         return errWrongArgumentNumber;
     }
 
     struct Artist artist;
+    artist.id = db->artistNumber;
+    strcpy(artist.name, command[0]);
+    artist.slave1 = -1;
+
+    int err = insertMaster(artist, db);
+    if (err != 0) {
+        if (err == 1) {
+            return errMasterFailure;
+        }
+
+        if (err == 2) {
+            return errIndexFailure;
+        }
+
+        return errUnhandled;
+    }
+
+    printf("id: %d", artist.id);
+
+    return "insert done successfully";
+}
+
+int insertMaster(struct Artist artist, struct dataBase* db) {
     struct ArtistInd artistInd;
 
     db->artistNumber++;
     db->fileSpaceArtists++;
 
-    artist.id = db->artistNumber;
-    strcpy(artist.name, command[0]);
-    artist.slave1 = -1;
-
     int address = writeToMaster(artist);
     if (address == -1) {
-        return errMasterFailure;
+        return 1;
     }
 
     artistInd.id = db->artistNumber;
@@ -339,17 +514,15 @@ char* insertMFunc(int argc, char* command[], struct dataBase* db) {
 
     int err = writeToIndex(artistInd);
     if (err == 1) {
-        return errIndexFailure;
+        return 2;
     }
 
     save(db);
 
-    printf("id: %d", artist.id);
-
-    return "insert done successfully";
+    return 0;
 }
 
-char* insertSFunc(int argc, char* command[], struct dataBase* db) {
+char* insertSHandler(int argc, char* command[], struct dataBase* db) {
     if (argc != 3) {
         return errWrongArgumentNumber;
     }
@@ -363,20 +536,39 @@ char* insertSFunc(int argc, char* command[], struct dataBase* db) {
 
     struct Album album;
 
-    int address = getIndex(artist_id, db);
-
-    if (address == -1) {
-        return errArtistNotExists;
-    }
-
-    db->fileSpaceAlbums++;
-    db->albumNumber++;
-
     album.id = db->albumNumber;
     strcpy(album.name, command[0]);
     album.year = year;
     album.artist_id = artist_id;
     album.nextSlave = -1;
+
+    int err = insertSlave(album, db);
+    if (err != 0) {
+        if (err == 1) {
+            return errMasterNotExists;
+        }
+
+        if (err == 2) {
+            return errSlaveFailure;
+        }
+
+        return errUnhandled;
+    }
+
+    printf("id: %d", album.id);
+
+    return "insert done successfully";
+}
+
+int insertSlave(struct Album album, struct dataBase* db) {
+    int address = readIndex(album.artist_id, db);
+
+    if (address == -1) {
+        return 1;
+    }
+
+    db->fileSpaceAlbums++;
+    db->albumNumber++;
 
     int slaveAddress = writeToSlave(album);
 
@@ -386,7 +578,8 @@ char* insertSFunc(int argc, char* command[], struct dataBase* db) {
 
     if (artist->slave1 == -1) {
         artist->slave1 = slaveAddress;
-        //todo update
+
+        updateMaster(*artist, db);
     } else {
         nextSlave = artist->slave1;
 
@@ -395,7 +588,12 @@ char* insertSFunc(int argc, char* command[], struct dataBase* db) {
 
             if (slaveAlbum->nextSlave == -1) {
                 slaveAlbum->nextSlave = slaveAddress;
-                //todo update
+
+                int err = updateSlave(*slaveAlbum, db);
+                if (err != 0) {
+                    return 2;
+                }
+
                 break;
             }
 
@@ -405,13 +603,29 @@ char* insertSFunc(int argc, char* command[], struct dataBase* db) {
 
     save(db);
 
-    printf("id: %d", album.id);
-
-    return "insert done successfully";
+    return 0;
 }
 
-const char* exitFunc() {
-    return exitCmd;
+char* countHandler(int argc, struct dataBase* db) {
+    if (argc != 0) {
+        return errWrongArgumentNumber;
+    }
+
+    char res[maxStringLength];
+
+    sprintf(res, "number of albums written to db: %d, number of artists written to db: %d", db->albumNumber, db->artistNumber);
+
+    printf("%s", res);
+
+    return "read successfully";
+}
+
+const char* exitHandler(int argc) {
+    if (argc != 0) {
+        return errWrongArgumentNumber;
+    }
+
+    return exitCommand;
 }
 
 struct dataBase newDataBase() {

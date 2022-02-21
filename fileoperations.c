@@ -4,7 +4,6 @@
 #include "artists.h"
 #include "albums.h"
 #include "fileoperations.h"
-#include "stringoperations.h"
 #include "database.h"
 
 // Files
@@ -73,7 +72,7 @@ int writeToSlave(struct Album album) {
     return address;
 }
 
-struct Artist* getMaster(int id, struct dataBase* db) {
+struct Artist* readMaster(int id, struct dataBase* db) {
     FILE* mFIle;
     int err;
 
@@ -84,7 +83,7 @@ struct Artist* getMaster(int id, struct dataBase* db) {
         return NULL;
     }
 
-    int address = getIndex(id, db);
+    int address = readIndex(id, db);
 
     if (address == -1) {
         return NULL;
@@ -97,7 +96,7 @@ struct Artist* getMaster(int id, struct dataBase* db) {
     return artist;
 }
 
-int getIndex(int id, struct dataBase* db) {
+int readIndex(int id, struct dataBase* db) {
     FILE* file;
     int err;
 
@@ -158,7 +157,7 @@ struct Artist* getMasterByAddress(int address) {
     FILE* mFIle;
     int err;
 
-    struct Artist artist;
+    struct Artist* artist = malloc(sizeof(struct Artist));
 
     err = openFile(masterFile, "rb", &mFIle);
     if (err == 1) {
@@ -166,18 +165,18 @@ struct Artist* getMasterByAddress(int address) {
     }
 
     fseek(mFIle, address, SEEK_SET);
-    fread(&artist, sizeof(struct Artist), 1, mFIle);
+    fread(artist, sizeof(struct Artist), 1, mFIle);
 
     fclose(mFIle);
 
-    return &artist;
+    return artist;
 }
 
 struct Album* getSlaveByAddress(int address) {
     FILE* file;
     int err;
 
-    struct Album album;
+    struct Album* album = malloc(sizeof(struct Album));
 
     err = openFile(slaveFile, "rb", &file);
     if (err == 1) {
@@ -185,11 +184,11 @@ struct Album* getSlaveByAddress(int address) {
     }
 
     fseek(file, address, SEEK_SET);
-    fread(&album, sizeof(struct Album), 1, file);
+    fread(album, sizeof(struct Album), 1, file);
 
     fclose(file);
 
-    return &album;
+    return album;
 }
 
 int deleteMaster(int address) {
@@ -201,9 +200,9 @@ int deleteMaster(int address) {
     emptyArtist.slave1 = 0;
     strcpy(emptyArtist.name, "");
 
-    err = openFile(masterFile, "rb", &file);
+    err = openFile(masterFile, "wb", &file);
     if (err == 1) {
-        return NULL;
+        return 1;
     }
 
     fseek(file, address, SEEK_SET);
@@ -219,6 +218,11 @@ int deleteMaster(int address) {
 int deleteIndex(int id, struct dataBase* db) {
     FILE* file;
     int err;
+
+    err = openFile(indexFile, "wb", &file);
+    if (err == 1) {
+        return 1;
+    }
 
     int address = -1;
 
@@ -261,7 +265,10 @@ int deleteAllSlaves(int masterAddress) {
     for (;;) {
         struct Album* album = getSlaveByAddress(address);
 
-        deleteSlave(address);
+        int err = deleteSlave(address);
+        if (err != 0) {
+            return 1;
+        }
 
         address = album->nextSlave;
         if (address == -1) {
@@ -283,7 +290,7 @@ int deleteSlave(int address) {
     emptyAlbum.artist_id = 0;
     emptyAlbum.year = 0;
 
-    err = openFile(slaveFile, "rb", &file);
+    err = openFile(slaveFile, "wb", &file);
     if (err == 1) {
         return 1;
     }

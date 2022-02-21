@@ -14,16 +14,34 @@ struct dataBase {
 };
 
 struct dataBase newDataBase();
-char* processCommand(int,char* [], struct dataBase*);
+char* processCommand(int argumentNumber, char* command[], struct dataBase* db);
+
 char* init(struct dataBase* db);
-char* getMFunc(int, char* [], struct dataBase*);
-char* getSFunc(int, char* [], struct dataBase*);
-char* delMFunc(int, char* [], struct dataBase*);
-char* delSFunc(int, char* [], struct dataBase*);
-char* updateMFunc(int, char* [], struct dataBase*);
-char* updateSFunc(int, char* [], struct dataBase*);
-char* insertMFunc(int, char* [], struct dataBase*);
-char* insertSFunc(int, char* [], struct dataBase*);
-const char* exitFunc();
+
+char* getMHandler(int argc, char* command[], struct dataBase* db);
+int getMaster(struct Artist* artist, int id, struct dataBase *db);
+
+char* getSHandler(int argc, char* command[], struct dataBase* db);
+int getSlave(struct Album* album, int id, int artist_id, struct dataBase* db);
+
+char* delMHandler(int argc, char* command[], struct dataBase* db);
+int delMaster(int id, struct dataBase* db);
+
+char* delSHandler(int argc, char* command[], struct dataBase* db);
+int delSlave(int id, int artist_id, struct dataBase* db);
+
+char* updateMHandler(int argc, char* command[], struct dataBase* db);
+int updateMaster(struct Artist artist, struct dataBase* db);
+
+char* updateSHandler(int argc, char* command[], struct dataBase* db);
+int updateSlave(struct Album album, struct dataBase* db);
+
+char* insertMHandler(int argc, char* command[], struct dataBase* db);
+int insertMaster(struct Artist artist, struct dataBase* db);
+
+char* insertSHandler(int argc, char* command[], struct dataBase* db);
+int insertSlave(struct Album album, struct dataBase* db);
+
+const char* exitHandler();
 
 #endif
