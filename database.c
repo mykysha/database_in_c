@@ -90,9 +90,9 @@ char* getMHandler(int argc, char* command[], struct dataBase* db) {
 
     int id = atoi(command[0]);
 
-    struct Artist *artist = NULL;
+    struct Artist artist;
 
-    int err = getMaster(artist, id, db);
+    int err = getMaster(&artist, id, db);
     if (err != 0) {
         if (err == 1) {
             return errMasterFailure;
@@ -103,7 +103,7 @@ char* getMHandler(int argc, char* command[], struct dataBase* db) {
 
     char res[maxStringLength];
 
-    sprintf(res, "id: %d, name %s", artist->id, artist->name);
+    sprintf(res, "id: %d, name %s", artist.id, artist.name);
 
     printf("%s", res);
 
@@ -111,11 +111,14 @@ char* getMHandler(int argc, char* command[], struct dataBase* db) {
 }
 
 int getMaster(struct Artist* artist, int id, struct dataBase* db) {
-    artist = readMaster(id, db);
+    struct Artist* readArtist = readMaster(id, db);
 
-    if (artist == NULL) {
+    if (readArtist == NULL) {
         return 1;
     }
+
+    artist->id = readArtist->id;
+    strcpy(artist->name, readArtist->name);
 
     return 0;
 }
@@ -137,9 +140,9 @@ char* getSHandler(int argc, char* command[], struct dataBase* db) {
 
     int id = atoi(command[0]);
 
-    struct Album *album = NULL;
+    struct Album album;
 
-    int err = getSlave(album, id, artist_id, db);
+    int err = getSlave(&album, id, artist_id, db);
     if (err != 0) {
         if (err == -1) {
             return errNoSlaves;
@@ -158,7 +161,7 @@ char* getSHandler(int argc, char* command[], struct dataBase* db) {
 
     char res[maxStringLength];
 
-    sprintf(res, "id: %d, name: %s, artist id: %d, year: %d", album->id, album->name, album->artist_id, album->year);
+    sprintf(res, "id: %d, name: %s, artist id: %d, year: %d", album.id, album.name, album.artist_id, album.year);
 
     printf("%s", res);
 
@@ -166,7 +169,11 @@ char* getSHandler(int argc, char* command[], struct dataBase* db) {
 }
 
 int getSlave(struct Album* album, int id, int artist_id, struct dataBase* db) {
-    struct Artist* artist = getMasterByAddress(artist_id);
+    struct Artist* artist = readMaster(artist_id, db);
+    if (artist == NULL) {
+        return -1;
+    }
+
     if (artist->slave1 == -1) {
         return -1;
     }
@@ -178,10 +185,15 @@ int getSlave(struct Album* album, int id, int artist_id, struct dataBase* db) {
         return 1;
     }
 
-    album = getSlaveByAddress(slaveAddress);
-    if (album == NULL) {
+    struct Album* readAlbum = getSlaveByAddress(slaveAddress);
+    if (readAlbum == NULL) {
         return 2;
     }
+
+    album->id = readAlbum->id;
+    strcpy(album->name, readAlbum->name);
+    album->artist_id = readAlbum->artist_id;
+    album->year = readAlbum->year;
 
     return 0;
 }
@@ -309,17 +321,16 @@ char* updateMHandler(int argc, char* command[], struct dataBase* db) {
 
     int id = atoi(command[0]);
 
-    int oldAddr = readIndex(id, db);
-    deleteMaster(oldAddr);
-    deleteIndex(id, db);
-
     struct Artist artist;
-
-    db->fileSpaceArtists++;
 
     artist.id = id;
     strcpy(artist.name, command[1]);
-    artist.slave1 = -1;
+
+    int oldAddr = readIndex(artist.id, db);
+
+    struct Artist* oldArtist = getMasterByAddress(oldAddr);
+
+    artist.slave1 = oldArtist->slave1;
 
     int err = updateMaster(artist, db);
     if (err != 0) {
@@ -340,6 +351,13 @@ char* updateMHandler(int argc, char* command[], struct dataBase* db) {
 }
 
 int updateMaster(struct Artist artist, struct dataBase* db) {
+    int oldAddr = readIndex(artist.id, db);
+
+    deleteMaster(oldAddr);
+    deleteIndex(artist.id, db);
+
+    db->fileSpaceArtists++;
+
     struct ArtistInd artistInd;
 
     int address = writeToMaster(artist);
@@ -388,6 +406,17 @@ char* updateSHandler(int argc, char* command[], struct dataBase* db) {
     album.year = year;
     album.artist_id = artist_id;
 
+    int address = readIndex(album.artist_id, db);
+
+    struct Artist* artist;
+
+    artist = getMasterByAddress(address);
+
+    int oldAddr = getSlaveAddress(album.id, artist->slave1);
+    int albumNextSlave = getSlaveByAddress(oldAddr)->nextSlave;
+
+    album.nextSlave = albumNextSlave;
+
     int err = updateSlave(album, db);
     if (err != 0) {
         if (err == 1) {
@@ -422,9 +451,6 @@ int updateSlave(struct Album album, struct dataBase* db) {
     artist = getMasterByAddress(address);
 
     int oldAddr = getSlaveAddress(album.id, artist->slave1);
-    int albumNextSlave = getSlaveByAddress(oldAddr)->nextSlave;
-
-    album.nextSlave = albumNextSlave;
 
     int err = deleteSlave(oldAddr);
     if (err != 0) {
@@ -432,15 +458,16 @@ int updateSlave(struct Album album, struct dataBase* db) {
     }
 
     db->fileSpaceAlbums++;
-    db->albumNumber++;
 
     int slaveAddress = writeToSlave(album);
+
+    save(db);
 
     artist = getMasterByAddress(address);
 
     int nextSlave;
 
-    if (artist->slave1 == -1 || artist->slave1 == oldAddr) {
+    if (artist->slave1 == oldAddr) {
         artist->slave1 = slaveAddress;
 
         err = updateMaster(*artist, db);
@@ -453,7 +480,7 @@ int updateSlave(struct Album album, struct dataBase* db) {
         for (;;) {
             struct Album* slaveAlbum = getSlaveByAddress(nextSlave);
 
-            if (slaveAlbum->nextSlave == -1 || slaveAlbum->nextSlave == oldAddr) {
+            if (slaveAlbum->nextSlave == oldAddr) {
                 slaveAlbum->nextSlave = slaveAddress;
 
                 err = updateSlave(*slaveAlbum, db);
@@ -479,7 +506,7 @@ char* insertMHandler(int argc, char* command[], struct dataBase* db) {
     }
 
     struct Artist artist;
-    artist.id = db->artistNumber;
+    artist.id = db->artistNumber+1;
     strcpy(artist.name, command[0]);
     artist.slave1 = -1;
 
@@ -539,7 +566,7 @@ char* insertSHandler(int argc, char* command[], struct dataBase* db) {
 
     struct Album album;
 
-    album.id = db->albumNumber;
+    album.id = db->albumNumber+1;
     strcpy(album.name, command[0]);
     album.year = year;
     album.artist_id = artist_id;
@@ -574,6 +601,8 @@ int insertSlave(struct Album album, struct dataBase* db) {
     db->albumNumber++;
 
     int slaveAddress = writeToSlave(album);
+
+    save(db);
 
     struct Artist* artist = getMasterByAddress(address);
 

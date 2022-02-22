@@ -14,7 +14,7 @@ const char indexFile[] = "artists.ind";
 int writeToMaster(struct Artist artist) {
     FILE *file = NULL;
 
-    int err = openFile(masterFile,"awb", &file);
+    int err = openFile(masterFile,"ab", &file);
     if (err == 1) {
         return -1;
     }
@@ -35,7 +35,7 @@ int writeToMaster(struct Artist artist) {
 int writeToIndex(struct ArtistInd artistInd) {
     FILE *file = NULL;
 
-    int err = openFile(indexFile,"awb", &file);
+    int err = openFile(indexFile,"ab", &file);
     if (err == 1) {
         return 1;
     }
@@ -54,14 +54,14 @@ int writeToIndex(struct ArtistInd artistInd) {
 int writeToSlave(struct Album album) {
     FILE* file;
 
-    int err = openFile(slaveFile, "r+b", &file);
+    int err = openFile(slaveFile, "ab", &file);
     if (err == 1) {
         return -1;
     }
 
-    int address = ftell(file);
+    fseek(file, 0, SEEK_END);
 
-    fseek(file, address, SEEK_SET);
+    int address = ftell(file);
 
     fwrite(&album, sizeof(struct Album), 1, file);
 
@@ -76,7 +76,7 @@ struct Artist* readMaster(int id, struct dataBase* db) {
     FILE* mFIle;
     int err;
 
-    struct Artist* artist;
+    struct Artist* artist = malloc(sizeof(struct Artist));
 
     err = openFile(masterFile, "rb", &mFIle);
     if (err == 1) {
@@ -129,7 +129,7 @@ int readIndex(int id, struct dataBase* db) {
 int getSlaveAddress(int id, int fistSlave) {
     FILE* file;
 
-    int err = openFile(slaveFile, "r+b", &file);
+    int err = openFile(slaveFile, "rb", &file);
     if (err == 1) {
         return -1;
     }
@@ -309,7 +309,7 @@ int initialFileRead(struct dataBase* db) {
     FILE *indFile, *mFile;
     int err;
 
-    err = openFile(indexFile, "a+b", &indFile);
+    err = openFile(indexFile, "ab", &indFile);
     if(err == 1) {
         return 1;
     }
@@ -336,7 +336,7 @@ int initialFileRead(struct dataBase* db) {
 
     FILE *slFile;
 
-    err = openFile(slaveFile, "a+b", &slFile);
+    err = openFile(slaveFile, "ab", &slFile);
     if(err == 1) {
         return 1;
     }
@@ -367,7 +367,7 @@ int save(struct dataBase* db) {
 
     FILE* fileSlave;
 
-    err = openFile(slaveFile, "r+b", &fileSlave);
+    err = openFile(slaveFile, "rwb", &fileSlave);
     if (err == 1) {
         return 1;
     }
