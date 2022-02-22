@@ -360,7 +360,7 @@ int initialFileRead(struct dataBase* db) {
 int save(struct dataBase* db) {
     FILE* fileInd;
 
-    int err = openFile(indexFile, "r+b", &fileInd);
+    int err = openFile(indexFile, "rwb", &fileInd);
     if (err == 1) {
         return 1;
     }
